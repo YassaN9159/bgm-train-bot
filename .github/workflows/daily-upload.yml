@@ -33,9 +33,7 @@ jobs:
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
         run: python scripts/fetch_video.py
 
-      - name: BGM生成（Mubert）
-        env:
-          MUBERT_API_KEY: ${{ secrets.MUBERT_API_KEY }}
+      - name: BGM生成（yt-dlp）
         run: python scripts/fetch_music.py
 
       - name: 動画合成（FFmpeg）
