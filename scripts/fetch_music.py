@@ -26,15 +26,15 @@ def download_tracks(output_dir: str, count: int = 8) -> list:
     subprocess.run([
         "yt-dlp",
         f"ytsearch{count}:{query}",
-        "--match-filter", "duration > 60 & duration < 600",
         "-x",
         "--audio-format", "mp3",
-        "--audio-quality", "192K",
+        "--audio-quality", "192",
         "-o", os.path.join(output_dir, "%(id)s.%(ext)s"),
         "--no-playlist",
+        "--ignore-errors",
         "--quiet",
         "--no-warnings",
-    ], check=True)
+    ], check=False)
 
     tracks = sorted(glob.glob(os.path.join(output_dir, "*.mp3")))
     if not tracks:
