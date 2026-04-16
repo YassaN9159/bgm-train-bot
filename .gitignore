@@ -1,6 +1,29 @@
+# 一時ファイル
 tmp/
 *.mp4
 *.mp3
+
+# Python
 __pycache__/
 *.pyc
+*.pyo
+.venv/
+venv/
+env/
+*.egg-info/
+dist/
+build/
+
+# テスト・カバレッジ
+.pytest_cache/
+.coverage*
+
+# 環境変数
 .env
+
+# OS
+.DS_Store
+
+# IDE
+.idea/
+.vscode/
