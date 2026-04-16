@@ -4,20 +4,25 @@ import pytest
 from unittest.mock import MagicMock, patch, call
 from scripts.fetch_music import download_tracks, build_track_list, fetch_bgm
 
-def test_download_tracks_calls_yt_dlp(mocker, tmp_path):
-    mock_run = mocker.patch("scripts.fetch_music.subprocess.run")
-    mock_run.return_value = MagicMock(returncode=0)
-    # Create fake mp3 files so glob finds them
-    (tmp_path / "abc123.mp3").write_bytes(b"fake")
-    (tmp_path / "def456.mp3").write_bytes(b"fake")
+def test_download_tracks_uses_internet_archive(mocker, tmp_path):
+    mocker.patch(
+        "scripts.fetch_music.search_archive_tracks",
+        return_value=["id001", "id002", "id003"],
+    )
+    mocker.patch(
+        "scripts.fetch_music.get_mp3_url",
+        side_effect=lambda ident: f"https://archive.org/download/{ident}/track.mp3",
+    )
 
-    result = download_tracks(str(tmp_path), count=8)
+    fake_response = MagicMock()
+    fake_response.raise_for_status = MagicMock()
+    fake_response.iter_content = MagicMock(return_value=[b"fakedata"])
+    mocker.patch("scripts.fetch_music.requests.get", return_value=fake_response)
 
-    assert mock_run.called
-    cmd = mock_run.call_args[0][0]
-    assert "yt-dlp" in cmd[0]
-    assert "ytsearch8:" in cmd[1]
+    result = download_tracks(str(tmp_path), count=2)
+
     assert len(result) == 2
+    assert all(r.endswith(".mp3") for r in result)
 
 def test_build_track_list_fills_target(mocker):
     mocker.patch("scripts.fetch_music.get_audio_duration", return_value=180.0)
