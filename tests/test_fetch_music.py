@@ -1,39 +1,41 @@
 # tests/test_fetch_music.py
+import os
 import pytest
-from unittest.mock import MagicMock, patch
-from scripts.fetch_music import get_pat, generate_track, fetch_bgm
+from unittest.mock import MagicMock, patch, call
+from scripts.fetch_music import download_tracks, build_track_list, fetch_bgm
 
-def test_get_pat_calls_correct_endpoint(mocker):
-    mock_resp = MagicMock()
-    mock_resp.json.return_value = {"data": {"pat": "test-pat-token"}}
-    mock_resp.raise_for_status.return_value = None
-    mock_post = mocker.patch("scripts.fetch_music.requests.post", return_value=mock_resp)
+def test_download_tracks_calls_yt_dlp(mocker, tmp_path):
+    mock_run = mocker.patch("scripts.fetch_music.subprocess.run")
+    mock_run.return_value = MagicMock(returncode=0)
+    # Create fake mp3 files so glob finds them
+    (tmp_path / "abc123.mp3").write_bytes(b"fake")
+    (tmp_path / "def456.mp3").write_bytes(b"fake")
 
-    pat = get_pat("test@example.com", "license123")
+    result = download_tracks(str(tmp_path), count=8)
 
-    assert pat == "test-pat-token"
-    args, kwargs = mock_post.call_args
-    assert "GetServiceAccess" in args[0]
+    assert mock_run.called
+    cmd = mock_run.call_args[0][0]
+    assert "yt-dlp" in cmd[0]
+    assert "ytsearch8:" in cmd[1]
+    assert len(result) == 2
 
-def test_generate_track_returns_url(mocker):
-    mock_resp = MagicMock()
-    mock_resp.json.return_value = {
-        "data": {"tasks": [{"download_link": "https://example.com/bgm.mp3"}]}
-    }
-    mock_resp.raise_for_status.return_value = None
-    mocker.patch("scripts.fetch_music.requests.post", return_value=mock_resp)
+def test_build_track_list_fills_target(mocker):
+    mocker.patch("scripts.fetch_music.get_audio_duration", return_value=180.0)
+    tracks = ["a.mp3", "b.mp3", "c.mp3"]
+    result = build_track_list(tracks, target=3600)
+    total = len(result) * 180.0
+    assert total >= 3600
 
-    url = generate_track("test-pat", duration=3600)
-    assert url == "https://example.com/bgm.mp3"
-
-def test_fetch_bgm_creates_file(tmp_path, mocker):
-    mocker.patch("scripts.fetch_music.get_pat", return_value="fake-pat")
-    mocker.patch("scripts.fetch_music.generate_track", return_value="https://example.com/bgm.mp3")
-    mock_dl = MagicMock()
-    mock_dl.iter_content = lambda chunk_size: [b"audio_data"]
-    mock_dl.raise_for_status.return_value = None
-    mocker.patch("scripts.fetch_music.requests.get", return_value=mock_dl)
+def test_fetch_bgm_creates_output(mocker, tmp_path):
+    output = str(tmp_path / "bgm.mp3")
+    mocker.patch("scripts.fetch_music.download_tracks", return_value=["a.mp3", "b.mp3"])
+    mocker.patch("scripts.fetch_music.build_track_list", return_value=["a.mp3"] * 20)
+    mocker.patch("scripts.fetch_music.get_audio_duration", return_value=180.0)
+    mock_run = mocker.patch("scripts.fetch_music.subprocess.run")
+    mock_run.return_value = MagicMock(returncode=0)
     mocker.patch("builtins.open", mocker.mock_open())
+    mocker.patch("os.remove")
 
-    output = fetch_bgm("test@example.com:license123", str(tmp_path / "bgm.mp3"))
-    assert output.endswith("bgm.mp3")
+    result = fetch_bgm(output)
+    assert result == output
+    assert mock_run.called
